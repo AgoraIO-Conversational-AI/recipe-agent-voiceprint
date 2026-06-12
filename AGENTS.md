@@ -1,13 +1,13 @@
 # Agent Development Guide
 
-For coding agents working in `recipe-agent-translator`. This repository is the
-**translator** recipe in the Agora Conversational AI recipes family.
+For coding agents working in `recipe-agent-voiceprint`. This repository is the
+**voiceprint / speaker-lock** recipe in the Agora Conversational AI recipes family.
 
 ## System shape
 
 - **`server/`** — Python FastAPI agent backend (:8000). Owns Agora token
   generation and agent session lifecycle. Uses the managed `OpenAI` vendor
-  (Agora-managed, keyless) for translation. SDK: `agora-agents>=2.0.0`
+  (Agora-managed, keyless) as a plain voice assistant with Speaker Lock. SDK: `agora-agents>=2.0.0`
   (`import agora_agent`).
 - **`web/`** — Next.js 16 / React 19 / TypeScript frontend (:3000).
 - Auth: Token007 from `AGORA_APP_ID` + `AGORA_APP_CERTIFICATE`.
@@ -15,7 +15,19 @@ For coding agents working in `recipe-agent-translator`. This repository is the
 
 ## Pipeline
 
-`DeepgramSTT(language=SOURCE_LANG)` → `OpenAI` (translates to `TARGET_LANG`) → `MiniMaxTTS(voice=TTS_VOICE)`
+`DeepgramSTT(nova-3)` → Speaker Lock filters → `OpenAI` (plain assistant) → `MiniMaxTTS`
+
+Speaker Lock (`sal_mode: "locking"`) auto-locks the agent onto the first clear speaker
+detected in the channel, suppressing other voices and background noise. No enrollment
+is required. The SAL config is built in `server/src/sal_config.py` and passed as
+`sal=build_sal()` to `AgoraAgent(...)`.
+
+## SAL modes (for reference)
+
+- **`"locking"`** (this recipe) — auto-locks onto primary speaker; zero-key, no enrollment.
+- **`"recognition"`** (NOT used here) — locks onto a named speaker via a pre-hosted
+  16 kHz / 16-bit mono PCM voiceprint (≤ 2 MB) at a URL (`sample_urls`). The SDK has
+  no voiceprint-enrollment API — you must provide a pre-hosted PCM file.
 
 ## Routing / ownership
 
@@ -23,7 +35,7 @@ For coding agents working in `recipe-agent-translator`. This repository is the
 - Browser-facing `/api/*` paths are Next rewrites (`web/next.config.ts`) to the
   agent backend; do not add `web/app/api/**/route.ts` for agent/token logic.
 - Token generation and agent lifecycle live in `server/src/`.
-- Translation prompt builder lives in `server/src/translation_config.py`.
+- SAL config builder lives in `server/src/sal_config.py`.
 
 ## Supported modes
 
@@ -39,18 +51,17 @@ For coding agents working in `recipe-agent-translator`. This repository is the
 |---|---|---|
 | `AGORA_APP_ID` | — | required |
 | `AGORA_APP_CERTIFICATE` | — | required |
-| `SOURCE_LANG` | `es` | Deepgram STT language code |
-| `TARGET_LANG` | `English` | Language name for translation prompt |
-| `TTS_VOICE` | `English_captivating_female1` | MiniMax voice matching `TARGET_LANG` |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model for translation |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model |
 | `OPENAI_API_KEY` | — | optional — BYO only if your account requires it |
+| `TTS_VOICE` | `English_captivating_female1` | MiniMax TTS voice |
+| `AGENT_GREETING` | built-in | Optional opening line override |
 
 ## Patterns
 
 - Keep the web client calling `/api/*`; hide backend placement behind Next rewrites.
 - Keep token generation and the App Certificate in `server/`.
 - `OPENAI_API_KEY` is optional: Agora manages the OpenAI key by default (keyless).
-- Changing `TARGET_LANG` means also picking a matching target-language `TTS_VOICE`.
+- SAL config is a pure function in `sal_config.py` — keep it free of side effects and agora_agent imports.
 
 ## Anti-patterns
 
@@ -58,7 +69,8 @@ For coding agents working in `recipe-agent-translator`. This repository is the
 - Do not reintroduce Next Route Handlers for agent/token logic.
 - Do not put `PORT` in `server/.env.example` (it would clobber the random port
   that `verify:local:fastapi` injects via `load_dotenv(override=True)`).
-- Do not link to `docs/ai/` — that progressive-disclosure tree is not present yet.
+- Do not use `sal_mode: "recognition"` without a pre-hosted PCM voiceprint URL —
+  the SDK has no enrollment API.
 
 ## Commands
 

@@ -1,17 +1,30 @@
-# Agora Agent Backend — Translator Recipe
+# Agora Agent Backend — Voiceprint / Speaker Lock Recipe
 
 FastAPI service that owns Agora token generation and agent session lifecycle for
-the translator recipe. It is the service the web client reaches through the
-Next.js `/api/*` rewrite proxy (port 8000).
+the voiceprint / speaker-lock recipe. It is the service the web client reaches
+through the Next.js `/api/*` rewrite proxy (port 8000).
 
 ## What this service does
 
-Runs the translation pipeline using only Agora-managed vendors — **zero-key**:
+Runs a Speaker Lock voice agent pipeline using only Agora-managed vendors — **zero-key**,
+no enrollment required:
 
-**Pipeline:** `DeepgramSTT(language=SOURCE_LANG)` → `OpenAI` (translate to `TARGET_LANG`) → `MiniMaxTTS(voice_id=TTS_VOICE)`
+**Pipeline:** `DeepgramSTT(nova-3)` → Speaker Lock filters → `OpenAI` (plain assistant) → `MiniMaxTTS`
+
+Speaker Lock (`sal_mode: "locking"`) is activated by passing `sal=build_sal()` to the
+`AgoraAgent(...)` constructor. The SDK auto-locks onto the first clear speaker in the
+channel and suppresses other voices and background noise. The SAL config is built by the
+pure function in `server/src/sal_config.py`.
 
 The `OpenAI` vendor is Agora-managed (keyless by default). There is **no
 separate `llm/` service** in this recipe.
+
+### SAL modes (reference)
+
+| Mode | `sal_mode` | Enrollment |
+| --- | --- | --- |
+| Speaker Lock (this recipe) | `"locking"` | None — auto-locks on first clear speaker |
+| Named-speaker recognition | `"recognition"` | Pre-hosted 16 kHz/16-bit mono PCM voiceprint (≤ 2 MB) via `sample_urls`. SDK has no enrollment API. |
 
 ## Run
 
@@ -36,20 +49,15 @@ Optional:
 
 | Variable | Default | Notes |
 | --- | :---: | --- |
-| `SOURCE_LANG` | `es` | Deepgram STT language code for the speaker |
-| `TARGET_LANG` | `English` | Language name used in the translation prompt |
-| `TTS_VOICE` | `English_captivating_female1` | MiniMax voice matching `TARGET_LANG` |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model for translation |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model |
 | `OPENAI_API_KEY` | — | BYO only — Agora manages the OpenAI key by default (keyless). Set only if your account requires it. |
+| `TTS_VOICE` | `English_captivating_female1` | MiniMax TTS voice |
 | `AGENT_GREETING` | built-in | Optional opening line override |
-
-> Note: when you change `TARGET_LANG`, also pick a matching `TTS_VOICE` for
-> that target language.
 
 ## API
 
 - `GET /get_config` — token + channel/UID config
-- `POST /startAgent` — start an agent session
+- `POST /startAgent` — start a speaker-lock agent session
 - `POST /stopAgent` — stop an agent session
 
 The repo-root `bun run verify:local:fastapi` exercises these routes through the

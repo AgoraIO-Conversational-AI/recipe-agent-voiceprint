@@ -15,9 +15,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-	title: "Translator Recipe | Agora Conversational AI",
+	title: "Voiceprint / Speaker Lock Recipe | Agora Conversational AI",
 	description:
-		"Recipe: real-time speech translation — speak the source language, hear the target.",
+		"Recipe: Speaker Lock — the agent auto-locks onto the primary speaker and suppresses background voices and noise, no enrollment needed.",
 	icons: {
 		icon: [
 			{ url: "/favicon.ico" },

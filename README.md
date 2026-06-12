@@ -1,4 +1,4 @@
-# Agora Conversational AI — Voiceprint / Speaker Lock Recipe (Python)
+# Agora Conversational AI — Voiceprint (Speaker Lock) Recipe (Python)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/)
